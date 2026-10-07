@@ -1,0 +1,55 @@
+#P1:
+import numpy as np
+import matplotlib.pyplot as plt
+from PIL import Image
+
+# load image as grayscale matrix A
+img = Image.open("img.jpg").convert("L").resize((512, 512))
+A = np.array(img, dtype=float)
+print(A.shape)
+
+# shared functions
+def load_gray(path, size=512):
+    return np.array(Image.open(path).convert("L").resize((size, size)), dtype=float)
+
+def rank_k(U, S, Vt, k):
+    return U[:, :k] @ np.diag(S[:k]) @ Vt[:k, :]
+
+# P1: SVD from scratch
+def my_svd(A, tol=1e-10):
+    eigvals, V = np.linalg.eigh(A.T @ A)   # AtA is symmetric, so eigenvalues are real
+    idx = np.argsort(eigvals)[::-1]        # sort big to small
+    eigvals, V = eigvals[idx], V[:, idx]
+    eigvals = np.clip(eigvals, 0, None)    # remove tiny negatives from rounding
+    S = np.sqrt(eigvals)                   # sigma = sqrt(lambda)
+    keep = S > tol * S[0]                  # drop zero singular values
+    S, V = S[keep], V[:, keep]
+    U = (A @ V) / S                        # u_i = A v_i / sigma_i
+    return U, S, V.T
+
+# tests
+B = np.random.rand(50, 30)
+U, S, Vt = my_svd(B)
+print("Match NumPy:", np.allclose(S, np.linalg.svd(B, compute_uv=False)))
+print("Error:", np.linalg.norm(B - U @ np.diag(S) @ Vt))
+
+U, S, Vt = my_svd(A)
+S_np = np.linalg.svd(A, compute_uv=False)
+print("Top 50 match:", np.allclose(S[:50], S_np[:50]))
+print("Max diff:", np.max(np.abs(S - S_np[:len(S)])))
+
+mine = np.linalg.norm(A - rank_k(U, S, Vt, 50), 'fro')
+numpy_ = np.linalg.norm(A - rank_k(*np.linalg.svd(A, full_matrices=False), 50), 'fro')
+print("Rank-50 error mine:", mine, " NumPy:", numpy_)
+
+# plot
+plt.figure(figsize=(10, 4))
+plt.subplot(1, 2, 1)
+plt.semilogy(S, label="My SVD")
+plt.semilogy(S_np, "--", label="NumPy")
+plt.title("Singular values (log scale)"); plt.legend()
+
+plt.subplot(1, 2, 2)
+plt.semilogy(np.abs(S - S_np[:len(S)]) + 1e-20)
+plt.title("Difference per singular value")
+plt.show()
