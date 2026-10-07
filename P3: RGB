@@ -1,0 +1,34 @@
+#P3:
+# Colour image: 3 channel matrices, each compressed with rank-k SVD (my_svd)
+rgb_img = Image.open("img.jpg").convert("RGB").resize((512, 512))
+RGB = np.array(rgb_img, dtype=float)
+print("RGB array shape:", RGB.shape)
+
+# SVD once per channel, reused for every k
+rgb_decomp = [my_svd(RGB[:, :, c]) for c in range(3)]
+
+def compress_rgb(k_r, k_g=None, k_b=None):
+    """Compress R, G, B separately. Only k_r given -> all channels use it."""
+    ks_c = [k_r, k_r if k_g is None else k_g, k_r if k_b is None else k_b]
+    channels = []
+    for c in range(3):
+        Uc, Sc, Vtc = rgb_decomp[c]
+        Ck = np.clip(rank_k(Uc, Sc, Vtc, ks_c[c]), 0, 255)   # SVD can overshoot 0-255
+        channels.append(Ck)
+    return np.rint(np.stack(channels, axis=2)).astype(np.uint8)
+
+def storage_rgb(m, n, k):
+    return 3 * k * (m + n + 1), 3 * m * n
+
+ks = [5, 20, 50, 100]
+fig, axes = plt.subplots(1, 5, figsize=(20, 4))
+axes[0].imshow(rgb_img); axes[0].set_title("Original")
+for ax, k in zip(axes[1:], ks):
+    out = compress_rgb(k)
+    ax.imshow(out); ax.set_title(f"k = {k}  {out.shape} {out.dtype}")
+for ax in axes: ax.axis("off")
+plt.tight_layout(); plt.show()
+
+for k in ks:
+    used, orig = storage_rgb(512, 512, k)
+    print(f"k={k:3d}: stores {used:,} vs original {orig:,}  ({used / orig:.1%})")
