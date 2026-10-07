@@ -1,0 +1,78 @@
+#P5:
+# Break-even for our image (no input(): values come from A)
+k_demo = 50
+original = m * n
+svd_storage = k_demo * (m + n + 1)
+threshold = original / (m + n + 1)
+largest_k = (original - 1) // (m + n + 1)    # largest integer k with k(m+n+1) < mn
+
+print("Formula: beneficial only if k*(m+n+1) < m*n")
+print(f"Image: {m} x {n}, k = {k_demo}")
+print("Original storage:", original)
+print("SVD storage:", svd_storage)
+print(f"Break-even k: {threshold:.2f}")
+print("Largest beneficial k:", largest_k)
+print(f"Compression ratio: {original / svd_storage:.2f}x")
+print(f"Storage saving: {(1 - svd_storage / original) * 100:.2f}%")
+print("Status:", "BENEFICIAL" if svd_storage < original else "NOT BENEFICIAL")
+
+ks_be = np.arange(1, 513)
+plt.plot(ks_be, ks_be * (m + n + 1) / (m * n))
+plt.axhline(1, color="r", ls="--", label="original size")
+plt.axvline(threshold, color="g", ls="--", label=f"break-even k = {threshold:.0f}")
+plt.xlabel("k"); plt.ylabel("compressed / original storage"); plt.legend(); plt.show()
+
+#Failure Case 1
+# Failure case 1: tiny image, k too large -> good reconstruction, MORE storage
+m2, n2, k2 = 20, 20, 15
+rng = np.random.default_rng(0)
+small = rng.random((m2, n2))
+Us, Ss, Vts = my_svd(small)                     # local names: don't touch U, S, Vt
+approx = rank_k(Us, Ss, Vts, k2)
+rel_err = np.linalg.norm(small - approx) / np.linalg.norm(small)
+
+orig2 = m2 * n2
+svd2 = k2 * (m2 + n2 + 1)
+print(f"Image {m2}x{n2}, k={k2}")
+print("Original storage:", orig2, "| SVD storage:", svd2)
+print(f"Relative error: {rel_err:.4f}")
+print(f"Storage saving: {(1 - svd2 / orig2) * 100:.2f}%")
+print("Status:", "BENEFICIAL" if svd2 < orig2 else "NOT BENEFICIAL (SVD stores more than the original)")
+
+
+
+#Failure Case 2
+# Failure case 2: text image (synthetic, no upload). Sharp edges -> slow singular value decay
+import textwrap
+from PIL import ImageDraw, ImageFont
+from matplotlib import font_manager
+
+def make_text_image(size=512):
+    im = Image.new("L", (size, size), 255)
+    d = ImageDraw.Draw(im)
+    font = ImageFont.truetype(font_manager.findfont("DejaVu Sans"), 14)
+    txt = ("The singular value decomposition factors any matrix A as U S V transpose. "
+           "Truncating to rank k keeps the largest singular values and gives the best "
+           "rank k approximation in the Frobenius norm. ") * 20
+    for i, line in enumerate(textwrap.wrap(txt, width=60)[:27]):
+        d.text((8, 8 + 18 * i), line, fill=0, font=font)
+    return np.asarray(im, dtype=float)
+
+T = make_text_image()
+Ut, St, Vtt = my_svd(T)
+k95 = lambda sv: int(np.searchsorted(np.cumsum(sv**2) / np.sum(sv**2), 0.95)) + 1
+print(f"k for 95% energy -> photo: {k95(S)}, text: {k95(St)}  (break-even = {largest_k})")
+
+fig, axes = plt.subplots(1, 5, figsize=(20, 4))
+axes[0].imshow(T, cmap="gray", vmin=0, vmax=255); axes[0].set_title("Original text")
+for ax, k in zip(axes[1:], [5, 20, 50, 100]):
+    Tk = np.clip(rank_k(Ut, St, Vtt, k), 0, 255)
+    Pk = np.clip(rank_k(U, S, Vt, k), 0, 255)
+    ax.imshow(Tk, cmap="gray", vmin=0, vmax=255)
+    ax.set_title(f"k={k}  PSNR {calculate_psnr(T, Tk):.1f} dB (photo {calculate_psnr(A, Pk):.1f})")
+for ax in axes: ax.axis("off")
+plt.tight_layout(); plt.show()
+
+plt.semilogy(S / S[0], label="photo"); plt.semilogy(St / St[0], label="text")
+plt.xlabel("index i"); plt.ylabel("sigma_i / sigma_1"); plt.legend()
+plt.title("Text image: singular values decay slowly"); plt.show()
