@@ -1,0 +1,30 @@
+#P2:
+ks = [5, 20, 50, 100]
+
+plt.figure(figsize=(14, 8))
+plt.subplot(2, 3, 1)
+plt.imshow(A, cmap="gray", vmin=0, vmax=255)
+plt.title("Original"); plt.axis("off")
+
+print(f"Original matrix storage: {m * n} values\n")
+print(f"{'k':<8}{'Values stored':<16}{'Ratio':<10}{'Saved'}")
+print("-" * 45)
+
+for i, k in enumerate(ks):
+    Ak = rank_k(U, S, Vt, k)
+    plt.subplot(2, 3, i + 2)
+    plt.imshow(np.clip(Ak, 0, 255), cmap="gray", vmin=0, vmax=255)
+    plt.title(f"k = {k}"); plt.axis("off")
+
+    stored = k * (m + n + 1)
+    print(f"{k:<8}{stored:<16}{(m * n) / stored:<10.2f}{(1 - stored / (m * n)) * 100:.2f}%")
+
+plt.suptitle("SVD Rank-k Grayscale Image Compression", fontsize=16)
+plt.tight_layout(); plt.show()
+#singularvalueindexvssingularvalue
+plt.figure(figsize=(10, 6))
+plt.semilogy(S)
+plt.title("Singular Value Decay")
+plt.xlabel("Singular value index")
+plt.ylabel("Singular value (log scale)")
+plt.grid(); plt.show()
