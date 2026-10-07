@@ -1,0 +1,40 @@
+#P4:
+def frobenius_error(X, Xk):
+    return np.linalg.norm(X - Xk, ord="fro")
+
+def calculate_psnr(X, Xk):
+    mse = np.mean((X - Xk) ** 2)
+    return float("inf") if mse == 0 else 10 * np.log10((255 ** 2) / mse)
+
+def discarded_singular_value_error(sv, k):
+    # ||A - A_k||_F = sqrt(sigma_{k+1}^2 + sigma_{k+2}^2 + ...)
+    return np.sqrt(np.sum(sv[k:] ** 2))
+
+# --- Table for chosen k's (uses the shared U, S, Vt: no recomputation) ---
+k_values = [k for k in [5, 10, 20, 40, 80] if k <= min(A.shape)]
+
+print(f"{'k':>4} {'Frobenius':>12} {'sqrt(sum tail s^2)':>20} {'abs diff':>10} {'PSNR (dB)':>10}")
+for k in k_values:
+    Ak = rank_k(U, S, Vt, k)                      # unclipped: identity holds exactly
+    err = frobenius_error(A, Ak)
+    thy = discarded_singular_value_error(S, k)
+    ps = calculate_psnr(A, np.clip(Ak, 0, 255))   # PSNR on the displayable image
+    print(f"{k:>4} {err:>12.4f} {thy:>20.4f} {abs(err - thy):>10.2e} {ps:>10.4f}")
+
+# --- Curves over all k ---
+k_all = np.arange(1, min(256, len(S)) + 1)
+fro_curve, psnr_curve = [], []
+for k in k_all:
+    Ak = rank_k(U, S, Vt, k)
+    fro_curve.append(frobenius_error(A, Ak))
+    psnr_curve.append(calculate_psnr(A, np.clip(Ak, 0, 255)))
+
+plt.figure(figsize=(8, 5))
+plt.plot(k_all, fro_curve); plt.grid(True)
+plt.xlabel("Rank k"); plt.ylabel("Frobenius error"); plt.title("Frobenius Error vs Rank k")
+plt.show()
+
+plt.figure(figsize=(8, 5))
+plt.plot(k_all, psnr_curve); plt.grid(True)
+plt.xlabel("Rank k"); plt.ylabel("PSNR (dB)"); plt.title("PSNR vs Rank k")
+plt.show()
