@@ -1,0 +1,4 @@
+# Shared by P2, P4, P5: don't reassign U, S, Vt, m, n anywhere below
+U, S, Vt = my_svd(A)
+m, n = A.shape
+print(U.shape, S.shape, Vt.shape)
